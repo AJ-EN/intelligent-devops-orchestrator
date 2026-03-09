@@ -4,6 +4,7 @@ import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity"
 import { AzureOpenAI } from "openai";
 
 import type { WorkflowRun } from "../tools/githubTools";
+import { extractMessageContent } from "../tools/llmTools";
 
 type TriageCategory =
   | "test_failure"
@@ -22,10 +23,6 @@ export interface TriageResult {
   severity: TriageSeverity;
   summary: string;
   suggestedFix: string;
-}
-
-function getMessageContent(content: string | null): string {
-  return content ?? "";
 }
 
 export async function runTriageAgent(
@@ -72,7 +69,9 @@ export async function runTriageAgent(
     temperature: 0,
   });
 
-  const content = getMessageContent(response.choices[0]?.message?.content ?? "");
+  const content = extractMessageContent(
+    response.choices[0]?.message?.content ?? "",
+  );
 
   try {
     const parsed = JSON.parse(content) as {

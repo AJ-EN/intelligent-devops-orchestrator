@@ -4,6 +4,7 @@ import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity"
 import { AzureOpenAI } from "openai";
 
 import type { TriageResult } from "./triageAgent";
+import { extractMessageContent } from "../tools/llmTools";
 
 type FixConfidence = "high" | "medium" | "low";
 
@@ -13,10 +14,6 @@ export interface FixResult {
   codeChanges: string;
   filesAffected: string[];
   confidence: FixConfidence;
-}
-
-function getMessageContent(content: string | null): string {
-  return content ?? "";
 }
 
 function isValidConfidence(value: unknown): value is FixConfidence {
@@ -65,7 +62,9 @@ export async function runFixAgent(triage: TriageResult): Promise<FixResult> {
     temperature: 0,
   });
 
-  const content = getMessageContent(response.choices[0]?.message?.content ?? "");
+  const content = extractMessageContent(
+    response.choices[0]?.message?.content ?? "",
+  );
 
   try {
     const parsed = JSON.parse(content) as {

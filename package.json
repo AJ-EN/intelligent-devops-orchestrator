@@ -1,7 +1,7 @@
 {
   "name": "intelligent-devops-orchestrator",
   "version": "1.0.0",
-  "description": "",
+  "description": "Autonomous multi-agent CI/CD orchestrator using Azure AI Foundry, GPT-4o, and MCP",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
@@ -11,7 +11,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@azure/ai-projects": "^2.0.0",
