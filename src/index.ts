@@ -1,3 +1,5 @@
+import readline from "node:readline";
+
 import dotenv from "dotenv";
 
 import { runFixAgent } from "./agents/fixAgent";
@@ -5,15 +7,18 @@ import { runMonitoringAgent } from "./agents/monitoringAgent";
 import { runPRAgent } from "./agents/prAgent";
 import { runTriageAgent } from "./agents/triageAgent";
 import { getRunLogs } from "./tools/githubTools";
+import { getClient, initTelemetry } from "./tools/foundryClient";
+
+dotenv.config();
 
 async function main(): Promise<void> {
+  initTelemetry();
+
+  const owner = process.argv[2] ?? "AJ-EN";
+  const repo = process.argv[3] ?? "devops-test";
+  console.log(`🎯 Targeting: ${owner}/${repo}`);
+
   try {
-    const owner = "AJ-EN";
-    const repo = "devops-test";
-
-    dotenv.config();
-
-    const { getClient } = await import("./tools/foundryClient");
     const client = getClient();
     const agents: unknown[] = [];
 
@@ -33,8 +38,27 @@ async function main(): Promise<void> {
     const logs = await getRunLogs(owner, repo, monitoringResult.id);
     const triageResult = await runTriageAgent(monitoringResult, logs);
     console.log("🔍 Triage result:", JSON.stringify(triageResult, null, 2));
+
     const fixResult = await runFixAgent(triageResult);
     console.log("🔧 Fix result:", JSON.stringify(fixResult, null, 2));
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const approved = await new Promise<boolean>((resolve) => {
+      rl.question("\n⚠️  Auto-fix ready. Create PR? (yes/no): ", (answer) => {
+        rl.close();
+        resolve(answer.toLowerCase() === "yes");
+      });
+    });
+
+    if (!approved) {
+      console.log("🛑 PR creation cancelled by user.");
+      process.exit(0);
+    }
+
     const prResult = await runPRAgent(owner, repo, triageResult, fixResult);
     console.log("🚀 PR result:", JSON.stringify(prResult, null, 2));
   } catch (error) {

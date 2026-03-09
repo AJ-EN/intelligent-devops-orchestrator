@@ -1,1 +1,1 @@
-export { getClient } from "./tools/foundryClient";
+export { getClient, initTelemetry } from "./tools/foundryClient";
