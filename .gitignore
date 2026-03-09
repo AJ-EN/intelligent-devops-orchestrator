@@ -1,0 +1,42 @@
+# dependencies
+/node_modules/
+
+# built files
+/dist/
+/build/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# dotenv environment variables
+.env
+
+# VSCode
+.vscode/
+
+# MacOS
+.DS_Store
+
+# lock files (if not committed)
+package-lock.json
+yarn.lock
+
+# Editor directories and files
+.idea/
+
+# output of bundlers
+/.parcel-cache/
+
+# other
+coverage/
+
+# local env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
