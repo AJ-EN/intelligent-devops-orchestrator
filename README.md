@@ -103,7 +103,7 @@ The orchestrator integrates Azure Application Insights through Azure Monitor Ope
 |---|---|
 | Microsoft Foundry | Project management, model deployment, agent registry |
 | Agent Framework | AIProjectClient, 4-agent orchestration |
-| Azure MCP | Tool interfaces for GitHub and Azure services |
+| Azure MCP | MCPTools module registers 6 tool capabilities: GitHub monitoring, Azure deployment, DevOps automation |
 | GitHub Copilot Agent Mode | Integrated in fix generation pipeline |
 | Real-world Impact | Saves hours of manual triage per incident |
 | Agentic DevOps | Full CI/CD automation from detection to PR |

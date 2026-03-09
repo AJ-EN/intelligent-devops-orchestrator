@@ -7,12 +7,15 @@ import { runMonitoringAgent } from "./agents/monitoringAgent";
 import { runPRAgent } from "./agents/prAgent";
 import { runTriageAgent } from "./agents/triageAgent";
 import { getRunLogs } from "./tools/githubTools";
+import { listMCPCapabilities } from "./tools/mcpTools";
 import { getClient, initTelemetry } from "./tools/foundryClient";
 
 dotenv.config();
 
 async function main(): Promise<void> {
   initTelemetry();
+  const mcpCapabilities = await listMCPCapabilities();
+  console.log("🔌 MCP tools:", mcpCapabilities);
 
   const owner = process.argv[2] ?? "AJ-EN";
   const repo = process.argv[3] ?? "devops-test";
