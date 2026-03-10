@@ -32,13 +32,13 @@ async function main(): Promise<void> {
       "🤖 Agents registered in Foundry:",
       Object.values(registry).map((agent) => agent.name),
     );
-    const agents: unknown[] = [];
+    let agentCount = 0;
 
-    for await (const agent of client.agents.list()) {
-      agents.push(agent);
+    for await (const _agent of client.agents.list()) {
+      agentCount += 1;
     }
 
-    console.log("✅ Foundry connected. Agents available:", agents);
+    console.log("✅ Foundry connected. Agents:", agentCount);
 
     const monitoringResult = await runMonitoringAgent(mcpClient, owner, repo);
     console.log("Monitoring agent result:", monitoringResult);
