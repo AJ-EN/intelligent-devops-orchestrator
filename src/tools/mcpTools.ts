@@ -6,6 +6,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { getFailedRuns, getRunLogs } from "./githubTools";
+
 export interface MCPToolResult {
   toolName: string;
   result: string;
@@ -41,6 +43,8 @@ export async function initMCPServer(): Promise<Client> {
         inputSchema: {
           type: "object",
           properties: {
+            owner: { type: "string" },
+            repo: { type: "string" },
             runId: { type: "number" },
           },
         },
@@ -91,14 +95,65 @@ export async function initMCPServer(): Promise<Client> {
     ],
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => ({
-    content: [
-      {
-        type: "text",
-        text: "Tool executed: " + request.params.name,
-      },
-    ],
-  }));
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    try {
+      const args = request.params.arguments ?? {};
+
+      switch (request.params.name) {
+        case "list_failed_runs": {
+          const owner = typeof args.owner === "string" ? args.owner : "";
+          const repo = typeof args.repo === "string" ? args.repo : "";
+          const runs = await getFailedRuns(owner, repo);
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(runs),
+              },
+            ],
+          };
+        }
+        case "get_run_logs": {
+          const owner = typeof args.owner === "string" ? args.owner : "";
+          const repo = typeof args.repo === "string" ? args.repo : "";
+          const runId = typeof args.runId === "number" ? args.runId : 0;
+          const logs = await getRunLogs(owner, repo, runId);
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(logs),
+              },
+            ],
+          };
+        }
+        default:
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Tool executed: " + request.params.name,
+              },
+            ],
+          };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              error instanceof Error
+                ? error.message
+                : "MCP tool unavailable",
+          },
+        ],
+        isError: true,
+      };
+    }
+  });
 
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -115,9 +170,9 @@ export async function initMCPServer(): Promise<Client> {
   return client;
 }
 
-export async function listMCPCapabilities(): Promise<string[]> {
-  const client = await initMCPServer();
-  const { tools } = await client.listTools();
+export async function listMCPCapabilities(client?: Client): Promise<string[]> {
+  const activeClient = client ?? (await initMCPServer());
+  const { tools } = await activeClient.listTools();
   const capabilities = tools.map(
     (tool) => `${tool.name} - ${tool.description ?? "No description"}`,
   );

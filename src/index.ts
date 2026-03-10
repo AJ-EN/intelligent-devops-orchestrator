@@ -6,8 +6,7 @@ import { runFixAgent } from "./agents/fixAgent";
 import { runMonitoringAgent } from "./agents/monitoringAgent";
 import { runPRAgent } from "./agents/prAgent";
 import { runTriageAgent } from "./agents/triageAgent";
-import { getRunLogs } from "./tools/githubTools";
-import { listMCPCapabilities } from "./tools/mcpTools";
+import { initMCPServer, listMCPCapabilities } from "./tools/mcpTools";
 import {
   getClient,
   initTelemetry,
@@ -18,7 +17,8 @@ dotenv.config();
 
 async function main(): Promise<void> {
   initTelemetry();
-  const mcpCapabilities = await listMCPCapabilities();
+  const mcpClient = await initMCPServer();
+  const mcpCapabilities = await listMCPCapabilities(mcpClient);
   console.log("🔌 MCP tools:", mcpCapabilities);
 
   const owner = process.argv[2] ?? "AJ-EN";
@@ -40,19 +40,18 @@ async function main(): Promise<void> {
 
     console.log("✅ Foundry connected. Agents available:", agents);
 
-    const monitoringResult = await runMonitoringAgent(owner, repo);
+    const monitoringResult = await runMonitoringAgent(mcpClient, owner, repo);
     console.log("Monitoring agent result:", monitoringResult);
 
-    if (!monitoringResult) {
+    if (!monitoringResult.run) {
       return;
     }
 
-    const logs = await getRunLogs(owner, repo, monitoringResult.id);
     const triageResult = await runTriageAgent(
       client,
       registry.triage,
-      monitoringResult,
-      logs,
+      monitoringResult.run,
+      monitoringResult.logs,
     );
     console.log("🔍 Triage result:", JSON.stringify(triageResult, null, 2));
 
