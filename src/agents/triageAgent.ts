@@ -1,9 +1,7 @@
-import "@azure/openai/types";
-
-import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
-import { AzureOpenAI } from "openai";
+import type { AIProjectClient } from "@azure/ai-projects";
 
 import type { WorkflowRun } from "../tools/githubTools";
+import type { FoundryAgentRegistration } from "../tools/foundryClient";
 import { extractMessageContent } from "../tools/llmTools";
 
 type TriageCategory =
@@ -25,70 +23,98 @@ export interface TriageResult {
   suggestedFix: string;
 }
 
+function isValidCategory(value: unknown): value is TriageCategory {
+  return (
+    value === "test_failure" ||
+    value === "security_vulnerability" ||
+    value === "performance_regression" ||
+    value === "tech_debt" ||
+    value === "dependency_update" ||
+    value === "unknown"
+  );
+}
+
+function isValidSeverity(value: unknown): value is TriageSeverity {
+  return (
+    value === "critical" ||
+    value === "high" ||
+    value === "medium" ||
+    value === "low"
+  );
+}
+
 export async function runTriageAgent(
+  client: AIProjectClient,
+  agent: FoundryAgentRegistration,
   run: WorkflowRun,
   logs: string,
 ): Promise<TriageResult> {
-  const credential = new DefaultAzureCredential();
-  const azureADTokenProvider = getBearerTokenProvider(
-    credential,
-    "https://cognitiveservices.azure.com/.default",
-  );
-  const openai = new AzureOpenAI({
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
-    azureADTokenProvider,
-    deployment: "gpt-4o",
-    apiVersion: "2024-10-21",
-  });
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a DevOps triage expert. Always respond in valid JSON only, no markdown, no explanation.",
-      },
-      {
-        role: "user",
-        content: `Analyze this CI/CD failure:
-        
-        Workflow: ${run.name}
-        Commit: ${run.head_commit_message}
-        Logs: ${logs.substring(0, 2000)}
-        
-        Respond with exactly this JSON:
-        {
-          "category": "test_failure|security_vulnerability|performance_regression|tech_debt|dependency_update|unknown",
-          "severity": "critical|high|medium|low",
-          "summary": "one sentence description",
-          "suggestedFix": "concrete actionable fix in one sentence"
-        }`,
-      },
-    ],
-    temperature: 0,
-  });
-
-  const content = extractMessageContent(
-    response.choices[0]?.message?.content ?? "",
-  );
-
   try {
-    const parsed = JSON.parse(content) as {
-      category: TriageCategory;
-      severity: TriageSeverity;
-      summary: string;
-      suggestedFix: string;
-    };
+    const openAIClient = client.getOpenAIClient();
+    const conversation = await openAIClient.conversations.create({
+      items: [
+        {
+          type: "message",
+          role: "user",
+          content: `Analyze this CI/CD failure:
 
-    return {
-      runId: run.id,
-      runName: run.name,
-      category: parsed.category,
-      severity: parsed.severity,
-      summary: parsed.summary,
-      suggestedFix: parsed.suggestedFix,
-    };
+Workflow: ${run.name}
+Commit: ${run.head_commit_message}
+Logs: ${logs.substring(0, 2000)}
+
+Respond with exactly this JSON:
+{
+  "category": "test_failure|security_vulnerability|performance_regression|tech_debt|dependency_update|unknown",
+  "severity": "critical|high|medium|low",
+  "summary": "one sentence description",
+  "suggestedFix": "concrete actionable fix in one sentence"
+}`,
+        },
+      ],
+    });
+
+    try {
+      const response = await openAIClient.responses.create(
+        {
+          conversation: conversation.id,
+        },
+        {
+          body: {
+            agent: {
+              name: agent.name,
+              type: "agent_reference",
+            },
+          },
+        },
+      );
+      const content = extractMessageContent(response.output_text);
+      const parsed = JSON.parse(content) as {
+        category: unknown;
+        severity: unknown;
+        summary: unknown;
+        suggestedFix: unknown;
+      };
+
+      if (
+        !isValidCategory(parsed.category) ||
+        !isValidSeverity(parsed.severity) ||
+        typeof parsed.summary !== "string" ||
+        typeof parsed.suggestedFix !== "string"
+      ) {
+        throw new Error("Invalid triage payload");
+      }
+
+      return {
+        runId: run.id,
+        runName: run.name,
+        category: parsed.category,
+        severity: parsed.severity,
+        summary: parsed.summary,
+        suggestedFix: parsed.suggestedFix,
+      };
+    } finally {
+      await openAIClient.conversations.delete(conversation.id).catch(() => undefined);
+    }
   } catch {
     return {
       runId: run.id,

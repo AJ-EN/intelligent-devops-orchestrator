@@ -8,7 +8,11 @@ import { runPRAgent } from "./agents/prAgent";
 import { runTriageAgent } from "./agents/triageAgent";
 import { getRunLogs } from "./tools/githubTools";
 import { listMCPCapabilities } from "./tools/mcpTools";
-import { getClient, initTelemetry } from "./tools/foundryClient";
+import {
+  getClient,
+  initTelemetry,
+  registerAgents,
+} from "./tools/foundryClient";
 
 dotenv.config();
 
@@ -23,6 +27,11 @@ async function main(): Promise<void> {
 
   try {
     const client = getClient();
+    const registry = await registerAgents(client);
+    console.log(
+      "🤖 Agents registered in Foundry:",
+      Object.values(registry).map((agent) => agent.name),
+    );
     const agents: unknown[] = [];
 
     for await (const agent of client.agents.list()) {
@@ -39,10 +48,15 @@ async function main(): Promise<void> {
     }
 
     const logs = await getRunLogs(owner, repo, monitoringResult.id);
-    const triageResult = await runTriageAgent(monitoringResult, logs);
+    const triageResult = await runTriageAgent(
+      client,
+      registry.triage,
+      monitoringResult,
+      logs,
+    );
     console.log("🔍 Triage result:", JSON.stringify(triageResult, null, 2));
 
-    const fixResult = await runFixAgent(triageResult);
+    const fixResult = await runFixAgent(client, registry.fix, triageResult);
     console.log("🔧 Fix result:", JSON.stringify(fixResult, null, 2));
 
     const rl = readline.createInterface({
