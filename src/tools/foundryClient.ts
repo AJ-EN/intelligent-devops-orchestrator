@@ -90,6 +90,8 @@ export function initTelemetry(): void {
 }
 
 export function getClient(): AIProjectClient {
+  process.env.AZURE_TOKEN_CREDENTIALS ??= "AzureCliCredential";
+
   return new AIProjectClient(
     process.env.AZURE_AI_PROJECT_ENDPOINT!,
     new DefaultAzureCredential(),
